@@ -6,6 +6,7 @@ import { Cat }                                               from './cat';
 import { Mouse, drawBackground, drawWindCone, drawPlayer, drawHUD, drawGameOver, drawCursor } from './renderer';
 import { applyWindToCats }                                   from './wind';
 import { logEvent }                                           from './logger';
+import { seedRandom, generateSeed }                          from './rng';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const mouse: Mouse = { x: PX + 150, y: PY };
@@ -39,7 +40,14 @@ function loop(): void {
   spawnTimer++;
   const interval = Math.max(55, 140 - score * 4);
   if (spawnTimer >= interval && cats.length < MAX_CATS) {
-    cats.push(new Cat());
+    const cat = new Cat();
+    logEvent('cat_spawn', frame, {
+      x: Math.round(cat.x), y: Math.round(cat.y),
+      sz: +cat.sz.toFixed(2), bodyClr: cat.bodyClr,
+      vx: +cat.vx.toFixed(3), vy: +cat.vy.toFixed(3),
+      wanderAngle: +cat.wanderAngle.toFixed(3),
+    });
+    cats.push(cat);
     spawnTimer = 0;
   }
 
@@ -123,5 +131,7 @@ canvas.addEventListener('mousemove', (e: MouseEvent) => {
 });
 
 // ─── Go ──────────────────────────────────────────────────────────────────────
-logEvent('session_start', 0, { lives: 3 });
+const seed = generateSeed();
+seedRandom(seed);
+logEvent('session_start', 0, { lives: 3, seed });
 loop();

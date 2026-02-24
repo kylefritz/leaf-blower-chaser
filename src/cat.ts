@@ -1,5 +1,6 @@
 import { ctx } from './canvas';
 import { W, H, PX, PY } from './constants';
+import { rand } from './rng';
 
 interface Coat {
   body: string;
@@ -29,22 +30,22 @@ export class Cat {
   exclamTimer: number;
 
   constructor() {
-    const side = Math.floor(Math.random() * 4);
-    if      (side === 0) { this.x = Math.random() * W; this.y = -35; }
-    else if (side === 1) { this.x = W + 35;            this.y = Math.random() * H; }
-    else if (side === 2) { this.x = Math.random() * W; this.y = H + 35; }
-    else                 { this.x = -35;               this.y = Math.random() * H; }
+    const side = Math.floor(rand() * 4);
+    if      (side === 0) { this.x = rand() * W; this.y = -35; }
+    else if (side === 1) { this.x = W + 35;     this.y = rand() * H; }
+    else if (side === 2) { this.x = rand() * W; this.y = H + 35; }
+    else                 { this.x = -35;        this.y = rand() * H; }
 
-    const coat   = COATS[Math.floor(Math.random() * COATS.length)];
+    const coat   = COATS[Math.floor(rand() * COATS.length)];
     this.bodyClr = coat.body;
     this.earClr  = coat.ear;
-    this.sz      = 16 + Math.random() * 5;
-    this.wobble  = Math.random() * Math.PI * 2;
+    this.sz      = 16 + rand() * 5;
+    this.wobble  = Math.random() * Math.PI * 2; // visual only — not replayed
 
     const dx = PX - this.x;
     const dy = PY - this.y;
     const d  = Math.hypot(dx, dy);
-    const spd = 0.55 + Math.random() * 0.4;
+    const spd = 0.55 + rand() * 0.4;
     this.vx          = (dx / d) * spd;
     this.vy          = (dy / d) * spd;
     this.wanderAngle = Math.atan2(dy, dx);
@@ -67,7 +68,7 @@ export class Cat {
       this.vx *= 0.975;
       this.vy *= 0.975;
     } else {
-      this.wanderAngle += (Math.random() - 0.5) * 0.09;
+      this.wanderAngle += (rand() - 0.5) * 0.09;
       this.vx += Math.cos(this.wanderAngle) * 0.06;
       this.vy += Math.sin(this.wanderAngle) * 0.06;
       const sp = Math.hypot(this.vx, this.vy);

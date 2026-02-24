@@ -25,8 +25,10 @@ Event logging requires the server (`POST /log`); events are appended to `game-lo
 | `src/popup.ts` | Floating "+1 😸" text when a cat is scared off-screen |
 | `src/cat.ts` | Cat entity — wandering AI, wind response, drawing |
 | `src/renderer.ts` | Stateless draw functions: player, wind cone, HUD, cursor |
-| `src/main.ts` | Game loop, state arrays, input, wind→cat collision |
+| `src/main.ts` | Game loop, state arrays, input, wind→cat collision, player death |
+| `src/rng.ts` | Seeded PRNG (mulberry32) — `rand()` replaces `Math.random()` in game logic |
 | `src/logger.ts` | Browser-side event queue; batches to `POST /log` every 2 s, flushes on unload |
+| `src/replay.ts` | Pure replay function — seeds RNG, feeds mouse angles, simulates loop, returns events |
 | `server.ts` | Bun HTTP server — serves static files, writes `POST /log` to `game-log.jsonl`, spawns dev watcher |
 
 ## Tooling
@@ -42,23 +44,47 @@ Event logging requires the server (`POST /log`); events are appended to `game-lo
 - `ctx` is imported from `canvas.ts`; never re-query the DOM element.
 - Class properties are typed explicitly (no inferred-from-constructor shortcut).
 - `server.ts` is Bun-only (never bundled). `src/logger.ts` is browser-only (no Node/Bun imports).
+- **Game logic uses `rand()` from `rng.ts`, never `Math.random()` directly.** Particles and grass keep `Math.random()` — they're visual and must not pollute the game-logic RNG stream.
+- `src/replay.ts` mirrors the game loop from `main.ts`. If you change game logic in `main.ts`, apply the same change to `replay.ts`.
 
 ## Tests
 
 ```
 tests/
-  setup.ts               # canvas mock preloaded before all tests
+  setup.ts                    # canvas mock (path: ../src/canvas.ts) preloaded before all tests
   fixtures/
-    game-log.jsonl       # snapshot fixture for log tests
-  unit/                  # pure logic tests (constants, particle, popup, cat)
-  integration/           # multi-module tests (wind, scoring)
+    game-log.jsonl            # snapshot of a real session — used by log/ tests
+    close-call.jsonl          # 100-frame window where a cat reached 54 px from the player
+  unit/                       # pure logic: constants, particle, popup, cat
+  integration/                # multi-module: wind, scoring
   log/
-    fixture.test.ts      # invariant tests against game-log.jsonl snapshot — no canvas needed
+    fixture.test.ts           # schema + ordering invariants against game-log.jsonl (no canvas)
+    close-call.test.ts        # collision tests driven by the close-call position
+  replay/
+    session.test.ts           # determinism + loop invariants via synthetic sessions
 ```
 
-Log tests import no game source modules and don't need the canvas mock. They test
-event schema, per-session frame/timestamp ordering, mouse_move frame cadence,
-cat_scared force bounds, and per-session score accumulation.
+**Log tests** (`tests/log/`) import no game modules and need no canvas mock. Use `jq` to extract fixtures.
+
+**Replay tests** (`tests/replay/`) import `replay.ts` and `rng.ts`. They run the game-logic loop
+in process, so they do need the canvas mock (via setup.ts preload).
+
+### Deterministic replay
+
+Every session logs a `seed` in `session_start` and a `cat_spawn` event for each cat.
+`src/replay.ts` can reconstruct a session deterministically:
+
+1. Seed the PRNG with the logged seed — cat spawns and wander match the original.
+2. Feed `mouse_move` angles back as `playerAngle` each frame.
+3. Run the game-logic loop — `cat_scared`, `cat_fled`, `score_change`, `player_hit` events are produced.
+4. Diff the produced events against the log to verify the simulation is correct.
+
+To write a fixture-based replay test for a real session:
+```bash
+# Extract a session from the live log
+jq -c 'select(.session == "<uuid>")' game-log.jsonl > tests/fixtures/my-session.jsonl
+```
+Then load the fixture in a test and assert `replay(events)` matches the logged events.
 
 Use `jq` to inspect and extract log data, e.g.:
 ```bash

@@ -1,26 +1,17 @@
 # Leaf Blower Cat Chaser
 
 A 2D top-down browser game where you scare cats away with a leaf blower.
-Move your mouse to aim. Cats flee when hit by the wind cone. Score a point for every cat that runs off screen.
+Move your mouse to aim. Cats flee when hit by the wind cone. Score a point for every cat that runs off screen. You have 3 lives — a cat that reaches you costs one.
 
 <img src="game.png" />
 
 ## Play
 
-Build once, then open `index.html` in Chrome:
-
 ```bash
-bun run build
-open index.html
+bun run serve
 ```
 
-During development, use watch mode so the bundle rebuilds on every save:
-
-```bash
-bun run dev
-```
-
-Then refresh the browser after saving a file.
+Opens an HTTP server at http://localhost:8000, starts the build watcher, and serves the game. The server is required for event logging (`POST /log`).
 
 ## Controls
 
@@ -32,22 +23,54 @@ Then refresh the browser after saving a file.
 
 ```
 src/
-  constants.ts   — canvas size, wind range, cat cap
+  constants.ts   — canvas size, wind range, player radius, cat cap
   canvas.ts      — canvas/ctx setup and viewport scaling
   grass.ts       — pre-rendered offscreen grass background
   particle.ts    — wind particle emitted from the nozzle
   popup.ts       — floating "+1" text when a cat is scared off
   cat.ts         — Cat entity: wandering AI, wind response, drawing
   renderer.ts    — stateless draw functions (player, wind cone, HUD, cursor)
-  main.ts        — game loop, state, input handling
+  rng.ts         — seeded PRNG (mulberry32); game logic uses rand() not Math.random()
+  main.ts        — game loop, state, input, player death
+  logger.ts      — browser-side event queue, flushes to POST /log
+  replay.ts      — deterministic session replayer for V&V
+server.ts        — Bun HTTP server; serves files, appends events to game-log.jsonl
 dist/
   bundle.js      — compiled output (generated, not committed)
-index.html       — loads dist/bundle.js, nothing else
+index.html       — loads dist/bundle.js
+game-log.jsonl   — append-only session event log (gitignored)
 ```
+
+## Event log
+
+Every session appends structured events to `game-log.jsonl`:
+
+```jsonl
+{"session":"uuid","type":"session_start","t":0,"frame":0,"seed":123456789,"lives":3}
+{"session":"uuid","type":"cat_spawn","frame":55,"x":400,"y":-35,"sz":18.4,...}
+{"session":"uuid","type":"mouse_move","frame":10,"x":550,"y":300,"angle":0}
+{"session":"uuid","type":"cat_scared","frame":200,"force":0.65,"cx":320,"cy":280}
+{"session":"uuid","type":"cat_fled","frame":350,"cx":-90,"cy":220}
+{"session":"uuid","type":"score_change","frame":350,"score":1,"delta":1}
+{"session":"uuid","type":"player_hit","frame":500,"lives":2,"cx":405,"cy":295}
+{"session":"uuid","type":"game_over","frame":800,"score":4}
+```
+
+## Deterministic replay
+
+Sessions are fully replayable. The `seed` in `session_start` initialises the PRNG so cat spawns, sizes, and wander paths are identical on replay. `mouse_move` events supply the player angle each frame.
+
+```typescript
+import { replay } from './src/replay';
+const events = sessionJsonl.split('\n').map(JSON.parse);
+const produced = replay(events); // returns cat_scared, cat_fled, score_change, ...
+```
+
+Run `bun test` to verify that the replay engine is deterministic and that loop invariants hold.
 
 ## Tech
 
-- **Language:** TypeScript
-- **Bundler:** [Bun](https://bun.sh) (`bun build`)
+- **Language:** TypeScript (strict)
+- **Bundler / runtime:** [Bun](https://bun.sh)
 - **Renderer:** HTML5 Canvas 2D API
-- **Runtime:** browser — no server required
+- **Server:** Bun HTTP (`server.ts`) — required for event logging
