@@ -1,0 +1,7 @@
+export const W               = 800;
+export const H               = 600;
+export const PX              = W / 2;
+export const PY              = H / 2;
+export const WIND_RANGE      = 230;
+export const WIND_HALF_ANGLE = 0.30;   // ~17° each side
+export const MAX_CATS        = 10;
