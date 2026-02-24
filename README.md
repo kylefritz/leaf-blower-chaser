@@ -1,7 +1,7 @@
-# Leaf Blower Cat Chaser
+# Leaf Blower Chaser
 
-A 2D top-down browser game where you scare cats away with a leaf blower.
-Move your mouse to aim. Cats flee when hit by the wind cone. Score a point for every cat that runs off screen. You have 3 lives — a cat that reaches you costs one.
+A 2D top-down browser game where you scare cats and dogs away with a leaf blower.
+Move your mouse to aim. Blow them off screen to score — cats are worth 1 point, dogs are tougher but worth 2. You have 3 lives — any animal that reaches you costs one.
 
 <img src="game.png" />
 
@@ -27,15 +27,17 @@ Opens an HTTP server at http://localhost:8000, starts the build watcher, and ser
 
 ```
 src/
-  constants.ts   — canvas size, wind range, player radius, cat cap
+  constants.ts   — canvas size, wind range, player radius, cat/dog caps
+  blowable.ts    — shared interface for Cat and Dog entities
   canvas.ts      — canvas/ctx setup and viewport scaling
   grass.ts       — pre-rendered offscreen grass background
   particle.ts    — wind particle emitted from the nozzle
-  popup.ts       — floating "+1" text when a cat is scared off
+  popup.ts       — floating score text when an animal is scared off
   cat.ts         — Cat entity: wandering AI, wind response, drawing
+  dog.ts         — Dog entity: tougher, faster, worth more points
   renderer.ts    — stateless draw functions (player, wind cone, HUD, cursor)
   rng.ts         — seeded PRNG (mulberry32); game logic uses rand() not Math.random()
-  main.ts        — game loop, state, input, player death
+  main.ts        — game loop, state, input, player death, cat & dog scoring
   logger.ts      — browser-side event queue, flushes to POST /log
   replay.ts      — deterministic session replayer for V&V
 server.ts        — Bun HTTP server; serves files, persists events (JSONL locally, Neon Postgres in prod)
@@ -63,7 +65,7 @@ in production they go to a [Neon](https://neon.tech) Postgres database (`game_ev
 
 ## Deterministic replay
 
-Sessions are fully replayable. The `seed` in `session_start` initialises the PRNG so cat spawns, sizes, and wander paths are identical on replay. `mouse_move` events supply the player angle each frame.
+Sessions are fully replayable. The `seed` in `session_start` initialises the PRNG so cat and dog spawns, sizes, and wander paths are identical on replay. `mouse_move` events supply the player angle each frame.
 
 ```typescript
 import { replay } from './src/replay';
