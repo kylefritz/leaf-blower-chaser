@@ -3,6 +3,8 @@
 A 2D top-down browser game where you scare cats away with a leaf blower.
 Move your mouse to aim. Cats flee when hit by the wind cone. Score a point for every cat that runs off screen.
 
+<img src="game.png" />
+
 ## Play
 
 Build once, then open `index.html` in Chrome:
@@ -22,8 +24,8 @@ Then refresh the browser after saving a file.
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
+| Input      | Action              |
+| ---------- | ------------------- |
 | Mouse move | Aim the leaf blower |
 
 ## Project structure

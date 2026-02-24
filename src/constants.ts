@@ -5,3 +5,4 @@ export const PY              = H / 2;
 export const WIND_RANGE      = 230;
 export const WIND_HALF_ANGLE = 0.30;   // ~17° each side
 export const MAX_CATS        = 10;
+export const PLAYER_RADIUS   = 28;

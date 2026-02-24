@@ -29,6 +29,11 @@ Event logging requires the server (`POST /log`); events are appended to `game-lo
 | `src/logger.ts` | Browser-side event queue; batches to `POST /log` every 2 s, flushes on unload |
 | `server.ts` | Bun HTTP server — serves static files, writes `POST /log` to `game-log.jsonl`, spawns dev watcher |
 
+## Tooling
+
+- **Bun only** — no Node.js, no npm, no `node` commands. Use `bun`, `bun run`, `bun test`, `bun build`.
+- Use `jq` for log inspection and fixture extraction (see Tests section below).
+
 ## Code conventions
 
 - TypeScript strict mode — no `any`, no non-null assertions unless unavoidable.
@@ -54,6 +59,13 @@ tests/
 Log tests import no game source modules and don't need the canvas mock. They test
 event schema, per-session frame/timestamp ordering, mouse_move frame cadence,
 cat_scared force bounds, and per-session score accumulation.
+
+Use `jq` to inspect and extract log data, e.g.:
+```bash
+jq -c 'select(.type == "cat_scared")' game-log.jsonl          # filter by type
+jq -r '[.frame,.cx,.cy] | @tsv' ...                            # tabular output
+jq -c 'select(.session == "uuid" and .frame >= 100)' ...       # filter by session + frame
+```
 
 ## Agent teams
 

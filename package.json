@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "bun build src/main.ts --outfile dist/bundle.js --target browser --minify",
-    "test": "bun test --serial",
+    "test": "bun test",
     "serve": "bun run server.ts"
   },
   "devDependencies": {

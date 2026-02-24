@@ -38,7 +38,8 @@ export function drawWindCone(angle: number): void {
   ctx.fill();
 }
 
-export function drawPlayer(angle: number): void {
+export function drawPlayer(angle: number, invincible = 0): void {
+  if (invincible > 0 && Math.floor(invincible / 8) % 2 === 0) return;
   ctx.save();
   ctx.translate(PX, PY);
   ctx.rotate(angle);
@@ -107,7 +108,7 @@ export function drawPlayer(angle: number): void {
   ctx.restore();
 }
 
-export function drawHUD(score: number, catCount: number, frame: number): void {
+export function drawHUD(score: number, catCount: number, frame: number, lives = 3): void {
   // score panel
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.beginPath(); ctx.roundRect(12, 12, 215, 50, 8); ctx.fill();
@@ -135,6 +136,15 @@ export function drawHUD(score: number, catCount: number, frame: number): void {
     ctx.textAlign   = 'left';
     ctx.globalAlpha = 1;
   }
+
+  // lives — red hearts
+  ctx.font      = '22px Arial';
+  ctx.textAlign = 'left';
+  for (let i = 0; i < 3; i++) {
+    ctx.globalAlpha = i < lives ? 1 : 0.25;
+    ctx.fillText('❤️', W - 36 - i * 32, 44);
+  }
+  ctx.globalAlpha = 1;
 }
 
 export function drawCursor(mouse: Mouse): void {
@@ -150,4 +160,25 @@ export function drawCursor(mouse: Mouse): void {
   ctx.arc(0, 0, 5, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+}
+
+export function drawGameOver(score: number): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = '#ff4444';
+  ctx.font      = 'bold 64px Arial';
+  ctx.fillText('GAME OVER', W / 2, H / 2 - 40);
+
+  ctx.fillStyle = '#fff';
+  ctx.font      = '28px Arial';
+  ctx.fillText(`Cats scared away: ${score}`, W / 2, H / 2 + 20);
+
+  ctx.fillStyle = '#aaa';
+  ctx.font      = '18px Arial';
+  ctx.fillText('Refresh to play again', W / 2, H / 2 + 60);
+
+  ctx.textAlign = 'left';
 }

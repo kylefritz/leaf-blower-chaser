@@ -1,9 +1,8 @@
 /**
  * Preload: runs before every test file (configured in bunfig.toml).
  *
- * canvas.ts calls document.getElementById and getContext at import time,
- * which breaks in a non-browser environment. We replace it entirely with
- * a no-op mock so logic-only tests never touch the DOM.
+ * Mocks canvas.ts so game modules can be imported without a DOM.
+ * Path is relative to this file (tests/setup.ts → ../src/canvas.ts).
  */
 import { mock } from 'bun:test';
 
@@ -17,7 +16,7 @@ const noopCtx = new Proxy({} as CanvasRenderingContext2D, {
   set() { return true; },
 });
 
-mock.module('./src/canvas.ts', () => ({
+mock.module('../src/canvas.ts', () => ({
   canvas: {
     width: 800,
     height: 600,

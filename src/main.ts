@@ -1,9 +1,9 @@
 import { canvas }                                           from './canvas';
-import { W, H, PX, PY, MAX_CATS }                          from './constants';
+import { W, H, PX, PY, MAX_CATS, PLAYER_RADIUS }           from './constants';
 import { Particle }                                          from './particle';
 import { Popup }                                             from './popup';
 import { Cat }                                               from './cat';
-import { Mouse, drawBackground, drawWindCone, drawPlayer, drawHUD, drawCursor } from './renderer';
+import { Mouse, drawBackground, drawWindCone, drawPlayer, drawHUD, drawGameOver, drawCursor } from './renderer';
 import { applyWindToCats }                                   from './wind';
 import { logEvent }                                           from './logger';
 
@@ -14,6 +14,9 @@ let particles: Particle[] = [];
 let cats: Cat[]            = [];
 let popups: Popup[]        = [];
 let score      = 0;
+let lives      = 3;
+let invincible = 0;
+let gameOver   = false;
 let spawnTimer = 0;
 let frame      = 0;
 
@@ -52,6 +55,30 @@ function loop(): void {
     });
   });
 
+  // Player-cat collision
+  if (invincible === 0) {
+    cats = cats.filter(c => {
+      if (Math.hypot(c.x - PX, c.y - PY) < PLAYER_RADIUS + c.sz) {
+        lives--;
+        invincible = 120;
+        logEvent('player_hit', frame, { lives, cx: Math.round(c.x), cy: Math.round(c.y) });
+        return false;
+      }
+      return true;
+    });
+  }
+  if (invincible > 0) invincible--;
+
+  if (lives <= 0 && !gameOver) {
+    gameOver = true;
+    logEvent('game_over', frame, { score });
+  }
+
+  if (gameOver) {
+    drawGameOver(score);
+    return;
+  }
+
   for (const p of popups) p.update();
   popups = popups.filter(p => !p.dead);
 
@@ -78,9 +105,9 @@ function loop(): void {
   drawWindCone(playerAngle);
   for (const p of particles) p.draw();
   for (const c of cats)      c.draw();
-  drawPlayer(playerAngle);
+  drawPlayer(playerAngle, invincible);
   for (const p of popups)    p.draw();
-  drawHUD(score, cats.length, frame);
+  drawHUD(score, cats.length, frame, lives);
   drawCursor(mouse);
 
   requestAnimationFrame(loop);
@@ -96,5 +123,5 @@ canvas.addEventListener('mousemove', (e: MouseEvent) => {
 });
 
 // ─── Go ──────────────────────────────────────────────────────────────────────
-logEvent('session_start', 0);
+logEvent('session_start', 0, { lives: 3 });
 loop();
