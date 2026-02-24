@@ -5,11 +5,14 @@ const PORT = Number(process.env.PORT ?? 8000);
 const ROOT = import.meta.dir;
 const LOG_FILE = join(ROOT, "game-log.jsonl");
 
-const watcher = Bun.spawn(["bun", "build", "src/main.ts", "--outfile", "dist/bundle.js", "--target", "browser", "--watch"], {
-  cwd: ROOT,
-  stdout: "inherit",
-  stderr: "inherit",
-});
+const isDev = process.env.NODE_ENV !== "production";
+const watcher = isDev
+  ? Bun.spawn(["bun", "build", "src/main.ts", "--outfile", "dist/bundle.js", "--target", "browser", "--watch"], {
+      cwd: ROOT,
+      stdout: "inherit",
+      stderr: "inherit",
+    })
+  : null;
 
 const MIME: Record<string, string> = {
   ".html": "text/html",
@@ -56,10 +59,10 @@ const server = Bun.serve({
 
 console.log(`[server] http://localhost:${server.port}`);
 process.on("SIGINT", () => {
-  watcher.kill();
+  watcher?.kill();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
-  watcher.kill();
+  watcher?.kill();
   process.exit(0);
 });

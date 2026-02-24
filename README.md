@@ -7,6 +7,10 @@ Move your mouse to aim. Cats flee when hit by the wind cone. Score a point for e
 
 ## Play
 
+**Live at https://leaf-blower-cat-chaser.fly.dev/**
+
+Or run locally:
+
 ```bash
 bun run serve
 ```
@@ -68,9 +72,29 @@ const produced = replay(events); // returns cat_scared, cat_fled, score_change, 
 
 Run `bun test` to verify that the replay engine is deterministic and that loop invariants hold.
 
+## CI / CD
+
+Pushing to `main` triggers the GitHub Actions workflow (`.github/workflows/fly-deploy.yml`):
+
+1. **Test** — installs Bun, runs `bun test`
+2. **Deploy** — builds the Docker image and deploys to Fly.io (only runs if tests pass)
+
+To test the workflow locally with [act](https://github.com/nektos/act):
+
+```bash
+act -j test --container-architecture linux/amd64
+```
+
+To deploy manually:
+
+```bash
+flyctl deploy
+```
+
 ## Tech
 
 - **Language:** TypeScript (strict)
 - **Bundler / runtime:** [Bun](https://bun.sh)
 - **Renderer:** HTML5 Canvas 2D API
 - **Server:** Bun HTTP (`server.ts`) — required for event logging
+- **Hosting:** [Fly.io](https://fly.io) (Docker, `oven/bun:1` image)

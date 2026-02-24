@@ -36,8 +36,8 @@ describe('determinism', () => {
 
   test('different mouse angles → different scared events', () => {
     const seed = generateSeed();
-    const right = replay(makeSession(seed, 600, 0));           // aim right
-    const left  = replay(makeSession(seed, 600, Math.PI));     // aim left
+    const right = replay(makeSession(seed, 2000, 0));           // aim right
+    const left  = replay(makeSession(seed, 2000, Math.PI));     // aim left
     const scaredRight = right.filter(e => e.type === 'cat_scared');
     const scaredLeft  = left.filter(e => e.type === 'cat_scared');
     expect(scaredRight).not.toEqual(scaredLeft);

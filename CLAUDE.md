@@ -14,6 +14,17 @@ bun test        # run all tests
 Use `bun run serve` to develop and play — it spawns the build watcher automatically.
 Event logging requires the server (`POST /log`); events are appended to `game-log.jsonl`.
 
+## Deployment
+
+Hosted on [Fly.io](https://fly.io) at **https://leaf-blower-cat-chaser.fly.dev/**.
+
+```bash
+flyctl deploy   # build Docker image and deploy to Fly.io
+```
+
+The `Dockerfile` builds with `bun run build`, then runs `server.ts` with `NODE_ENV=production`
+(skips the file watcher). Config is in `fly.toml`.
+
 ## Module map
 
 | File | Responsibility |
