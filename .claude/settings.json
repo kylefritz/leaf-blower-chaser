@@ -8,7 +8,8 @@
       "Bash(bun*)",
       "Bash(~/.bun/bin/bun*)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(grep*)"
+      "Bash(grep*)",
+      "Bash(jq:*)"
     ]
   }
 }

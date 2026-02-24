@@ -38,7 +38,7 @@ src/
   main.ts        — game loop, state, input, player death
   logger.ts      — browser-side event queue, flushes to POST /log
   replay.ts      — deterministic session replayer for V&V
-server.ts        — Bun HTTP server; serves files, appends events to game-log.jsonl
+server.ts        — Bun HTTP server; serves files, persists events (JSONL locally, Neon Postgres in prod)
 dist/
   bundle.js      — compiled output (generated, not committed)
 index.html       — loads dist/bundle.js
@@ -47,7 +47,8 @@ game-log.jsonl   — append-only session event log (gitignored)
 
 ## Event log
 
-Every session appends structured events to `game-log.jsonl`:
+Every session records structured events. In dev they append to `game-log.jsonl`;
+in production they go to a [Neon](https://neon.tech) Postgres database (`game_events` table).
 
 ```jsonl
 {"session":"uuid","type":"session_start","t":0,"frame":0,"seed":123456789,"lives":3}
@@ -97,4 +98,5 @@ flyctl deploy
 - **Bundler / runtime:** [Bun](https://bun.sh)
 - **Renderer:** HTML5 Canvas 2D API
 - **Server:** Bun HTTP (`server.ts`) — required for event logging
+- **Database:** [Neon](https://neon.tech) serverless Postgres (production event storage)
 - **Hosting:** [Fly.io](https://fly.io) (Docker, `oven/bun:1` image)

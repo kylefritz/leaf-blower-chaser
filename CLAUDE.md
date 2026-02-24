@@ -12,7 +12,8 @@ bun test        # run all tests
 ```
 
 Use `bun run serve` to develop and play — it spawns the build watcher automatically.
-Event logging requires the server (`POST /log`); events are appended to `game-log.jsonl`.
+Event logging requires the server (`POST /log`); in dev events go to `game-log.jsonl`,
+in production they go to Neon Postgres.
 
 ## Deployment
 
@@ -24,6 +25,29 @@ flyctl deploy   # build Docker image and deploy to Fly.io
 
 The `Dockerfile` builds with `bun run build`, then runs `server.ts` with `NODE_ENV=production`
 (skips the file watcher). Config is in `fly.toml`.
+
+### Neon Postgres
+
+Production event logging uses [Neon](https://neon.tech) serverless Postgres
+(`@neondatabase/serverless`). The `DATABASE_URL` secret is set on Fly.io:
+
+```bash
+fly secrets set DATABASE_URL="postgresql://..." --app leaf-blower-cat-chaser
+```
+
+The `game_events` table stores events with typed columns (`session`, `type`, `t`, `frame`)
+and a `data` JSONB column for event-specific fields. Indexes on `session`, `type`,
+and `(session, frame)`.
+
+To test Neon locally, use direnv (`.envrc` is gitignored):
+
+```bash
+# .envrc
+export DATABASE_URL="postgresql://..."
+export NODE_ENV="production"
+```
+
+Then `direnv allow && bun run server.ts`.
 
 ## Module map
 
@@ -40,7 +64,7 @@ The `Dockerfile` builds with `bun run build`, then runs `server.ts` with `NODE_E
 | `src/rng.ts` | Seeded PRNG (mulberry32) — `rand()` replaces `Math.random()` in game logic |
 | `src/logger.ts` | Browser-side event queue; batches to `POST /log` every 2 s, flushes on unload |
 | `src/replay.ts` | Pure replay function — seeds RNG, feeds mouse angles, simulates loop, returns events |
-| `server.ts` | Bun HTTP server — serves static files, writes `POST /log` to `game-log.jsonl`, spawns dev watcher |
+| `server.ts` | Bun HTTP server — serves static files, `POST /log` to JSONL (dev) or Neon Postgres (prod), spawns dev watcher |
 
 ## Tooling
 
@@ -50,7 +74,7 @@ The `Dockerfile` builds with `bun run build`, then runs `server.ts` with `NODE_E
 ## Code conventions
 
 - TypeScript strict mode — no `any`, no non-null assertions unless unavoidable.
-- No runtime dependencies. Canvas 2D API only.
+- No browser runtime dependencies. Canvas 2D API only. Server uses `@neondatabase/serverless`.
 - Draw functions in `renderer.ts` are stateless — all state lives in `main.ts`.
 - `ctx` is imported from `canvas.ts`; never re-query the DOM element.
 - Class properties are typed explicitly (no inferred-from-constructor shortcut).

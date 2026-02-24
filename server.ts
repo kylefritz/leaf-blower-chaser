@@ -14,6 +14,49 @@ const watcher = isDev
     })
   : null;
 
+// ─── Neon Postgres (production only) ────────────────────────────────────────
+let sql: import("@neondatabase/serverless").NeonQueryFunction | null = null;
+
+if (!isDev) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error("[server] DATABASE_URL must be set in production");
+    process.exit(1);
+  }
+  const { neon } = await import("@neondatabase/serverless");
+  sql = neon(dbUrl);
+  console.log("[server] Neon Postgres connected");
+}
+
+// ─── Event persistence ──────────────────────────────────────────────────────
+interface GameEvent {
+  session: string;
+  type: string;
+  t: number;
+  frame: number;
+  [key: string]: unknown;
+}
+
+async function persistEvents(events: GameEvent[]): Promise<void> {
+  if (isDev || !sql) {
+    const lines = events.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    appendFileSync(LOG_FILE, lines, "utf8");
+    return;
+  }
+
+  try {
+    for (const { session, type, t, frame, ...rest } of events) {
+      await sql.query(
+        "INSERT INTO game_events (session, type, t, frame, data) VALUES ($1, $2, $3, $4, $5::jsonb)",
+        [session, type, t, frame, JSON.stringify(rest)],
+      );
+    }
+  } catch (err) {
+    console.error("[server] Neon insert failed:", err);
+  }
+}
+
+// ─── HTTP server ────────────────────────────────────────────────────────────
 const MIME: Record<string, string> = {
   ".html": "text/html",
   ".js": "application/javascript",
@@ -25,12 +68,9 @@ const server = Bun.serve({
     const url = new URL(req.url);
 
     if (req.method === "POST" && url.pathname === "/log") {
-      const events = (await req.json()) as unknown[];
-      const lines =
-        (Array.isArray(events) ? events : [events])
-          .map((e) => JSON.stringify(e))
-          .join("\n") + "\n";
-      appendFileSync(LOG_FILE, lines, "utf8");
+      const raw = (await req.json()) as unknown[];
+      const events = (Array.isArray(raw) ? raw : [raw]) as GameEvent[];
+      await persistEvents(events);
       return new Response("ok");
     }
 
