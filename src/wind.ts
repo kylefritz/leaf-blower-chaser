@@ -1,21 +1,21 @@
 import { PX, PY, WIND_RANGE, WIND_HALF_ANGLE } from './constants';
-import type { Cat } from './cat';
+import type { Blowable } from './blowable';
 
 /**
- * Apply wind force to any cats inside the player's wind cone.
+ * Apply wind force to any blowable entities inside the player's wind cone.
  * originX/originY default to the player's fixed position but are
  * exposed as parameters so tests can use arbitrary origins.
  */
 export function applyWindToCats(
-  cats: Cat[],
+  entities: Blowable[],
   playerAngle: number,
   originX = PX,
   originY = PY,
   onNewlyScared?: (force: number, cx: number, cy: number) => void,
 ): void {
-  for (const cat of cats) {
-    const dx   = cat.x - originX;
-    const dy   = cat.y - originY;
+  for (const entity of entities) {
+    const dx   = entity.x - originX;
+    const dy   = entity.y - originY;
     const dist = Math.hypot(dx, dy);
 
     if (dist < WIND_RANGE && dist > 22) {
@@ -25,13 +25,13 @@ export function applyWindToCats(
 
       if (Math.abs(diff) < WIND_HALF_ANGLE) {
         const force = 1 - dist / WIND_RANGE;
-        const wasScared = cat.scared;
-        cat.applyWind(
+        const wasScared = entity.scared;
+        entity.applyWind(
           Math.cos(playerAngle),
           Math.sin(playerAngle),
           force,
         );
-        if (!wasScared && cat.scared) onNewlyScared?.(force, cat.x, cat.y);
+        if (!wasScared && entity.scared) onNewlyScared?.(force, entity.x, entity.y);
       }
     }
   }

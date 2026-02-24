@@ -1,5 +1,5 @@
 import { ctx } from './canvas';
-import { W, H, PX, PY, WIND_RANGE, WIND_HALF_ANGLE, MAX_CATS } from './constants';
+import { W, H, PX, PY, WIND_RANGE, WIND_HALF_ANGLE, MAX_CATS, MAX_DOGS } from './constants';
 import grassCanvas from './grass';
 
 export interface Mouse {
@@ -108,31 +108,34 @@ export function drawPlayer(angle: number, invincible = 0): void {
   ctx.restore();
 }
 
-export function drawHUD(score: number, catCount: number, frame: number, lives = 3): void {
+export function drawHUD(score: number, catCount: number, dogCount: number, frame: number, lives = 3): void {
   // score panel
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.beginPath(); ctx.roundRect(12, 12, 215, 50, 8); ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.font      = 'bold 21px Arial';
-  ctx.fillText(`Cats Scared Away: ${score}`, 22, 44);
+  ctx.fillText(`Score: ${score}`, 22, 44);
 
   // on-screen count
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.roundRect(12, 68, 170, 30, 6); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(12, 68, 230, 30, 6); ctx.fill();
   ctx.fillStyle = '#ccc';
   ctx.font      = '14px Arial';
-  ctx.fillText(`On screen: ${catCount} / ${MAX_CATS}`, 22, 88);
+  ctx.fillText(`On screen: \u{1F638} ${catCount}/${MAX_CATS}  \u{1F436} ${dogCount}/${MAX_DOGS}`, 22, 88);
 
   // instructions — fade out after ~5 s
   if (frame < 320) {
     const a = Math.min(1, (320 - frame) / 80);
     ctx.globalAlpha = a;
     ctx.fillStyle   = 'rgba(0,0,0,0.55)';
-    ctx.beginPath(); ctx.roundRect(W / 2 - 195, H - 58, 390, 42, 8); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(W / 2 - 225, H - 72, 450, 56, 8); ctx.fill();
     ctx.fillStyle   = '#fff';
     ctx.font        = '16px Arial';
     ctx.textAlign   = 'center';
-    ctx.fillText('Move your mouse to aim the leaf blower and scare cats away!', W / 2, H - 30);
+    ctx.fillText('Aim the leaf blower to scare cats & dogs off screen to score!', W / 2, H - 48);
+    ctx.font        = '13px Arial';
+    ctx.fillStyle   = '#bbb';
+    ctx.fillText('Dogs are tougher but worth more. Don\u2019t let them reach you!', W / 2, H - 28);
     ctx.textAlign   = 'left';
     ctx.globalAlpha = 1;
   }

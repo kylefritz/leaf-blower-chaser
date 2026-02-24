@@ -1,6 +1,7 @@
 import { ctx } from './canvas';
 import { W, H, PX, PY } from './constants';
 import { rand } from './rng';
+import type { Blowable } from './blowable';
 
 interface Coat {
   body: string;
@@ -15,7 +16,7 @@ const COATS: Coat[] = [
   { body: '#c0784a', ear: '#9a5832' },  // ginger
 ];
 
-export class Cat {
+export class Cat implements Blowable {
   x: number;
   y: number;
   vx: number;

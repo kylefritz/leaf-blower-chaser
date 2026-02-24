@@ -47,10 +47,13 @@ describe('determinism', () => {
 // ─── Invariants ──────────────────────────────────────────────────────────────
 
 describe('replay invariants', () => {
-  test('every score_change is on the same frame as a cat_fled', () => {
+  test('every score_change is on the same frame as a cat_fled or dog_fled', () => {
     const events = replay(makeSession(42, 2000));
     for (const sc of events.filter(e => e.type === 'score_change')) {
-      expect(events.some(e => e.type === 'cat_fled' && e.frame === sc.frame)).toBe(true);
+      const fled = events.some(
+        e => (e.type === 'cat_fled' || e.type === 'dog_fled') && e.frame === sc.frame,
+      );
+      expect(fled).toBe(true);
     }
   });
 

@@ -6,12 +6,13 @@
  * The output can be diffed against the original log for V&V.
  *
  * Particles and popups are skipped — they're visual and don't affect state.
- * cat.ts uses rand() (seeded), so cat spawns and wander are deterministic.
+ * cat.ts and dog.ts use rand() (seeded), so spawns and wander are deterministic.
  */
 import { Cat }             from './cat';
+import { Dog }             from './dog';
 import { applyWindToCats } from './wind';
 import { seedRandom }      from './rng';
-import { PX, PY, MAX_CATS, PLAYER_RADIUS } from './constants';
+import { PX, PY, MAX_CATS, MAX_DOGS, DOG_POINTS, PLAYER_RADIUS } from './constants';
 import type { GameEvent }  from './logger';
 
 export interface ReplayEvent {
@@ -36,12 +37,14 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
 
   const maxFrame = Math.max(...sessionEvents.map(e => e.frame));
 
-  let cats:       Cat[]  = [];
-  let score       = 0;
-  let lives       = typeof start.lives === 'number' ? (start.lives as number) : 3;
-  let invincible  = 0;
-  let spawnTimer  = 0;
-  let playerAngle = 0;
+  let cats:         Cat[]  = [];
+  let dogs:         Dog[]  = [];
+  let score         = 0;
+  let lives         = typeof start.lives === 'number' ? (start.lives as number) : 3;
+  let invincible    = 0;
+  let spawnTimer    = 0;
+  let dogSpawnTimer = 0;
+  let playerAngle   = 0;
 
   const produced: ReplayEvent[] = [];
 
@@ -56,33 +59,63 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
       spawnTimer = 0;
     }
 
+    // Spawn dogs — after cats to keep RNG stream consistent
+    dogSpawnTimer++;
+    const dogInterval = Math.max(90, 200 - score * 3);
+    if (dogSpawnTimer >= dogInterval && dogs.length < MAX_DOGS) {
+      dogs.push(new Dog());
+      dogSpawnTimer = 0;
+    }
+
     // Update
     for (const c of cats) c.update();
+    for (const d of dogs) d.update();
 
-    // Wind
+    // Wind — cats
     applyWindToCats(cats, playerAngle, PX, PY, (force, cx, cy) => {
       produced.push({ type: 'cat_scared', frame,
         force: Math.round(force * 1000) / 1000,
         cx: Math.round(cx), cy: Math.round(cy) });
     });
 
-    // Player collision
+    // Wind — dogs
+    applyWindToCats(dogs, playerAngle, PX, PY, (force, cx, cy) => {
+      produced.push({ type: 'dog_scared', frame,
+        force: Math.round(force * 1000) / 1000,
+        cx: Math.round(cx), cy: Math.round(cy) });
+    });
+
+    // Player collision — cats
     if (invincible === 0) {
       cats = cats.filter(c => {
         if (Math.hypot(c.x - PX, c.y - PY) < PLAYER_RADIUS + c.sz) {
           lives--;
           invincible = 120;
-          produced.push({ type: 'player_hit', frame, lives,
+          produced.push({ type: 'player_hit', frame, entity: 'cat', lives,
             cx: Math.round(c.x), cy: Math.round(c.y) });
           return false;
         }
         return true;
       });
+
+      // Player collision — dogs (only if not already hit by a cat)
+      if (invincible === 0) {
+        dogs = dogs.filter(d => {
+          if (Math.hypot(d.x - PX, d.y - PY) < PLAYER_RADIUS + d.sz) {
+            lives--;
+            invincible = 120;
+            produced.push({ type: 'player_hit', frame, entity: 'dog', lives,
+              cx: Math.round(d.x), cy: Math.round(d.y) });
+            return false;
+          }
+          return true;
+        });
+      }
     }
     if (invincible > 0) invincible--;
 
-    // Fled
-    const before = cats.length;
+    // Cats fled
+    const catsBefore = cats.length;
     cats = cats.filter(c => {
       if (c.isGone()) {
         produced.push({ type: 'cat_fled', frame,
@@ -91,9 +124,23 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
       }
       return true;
     });
-    const delta = before - cats.length;
-    score += delta;
-    if (delta > 0) produced.push({ type: 'score_change', frame, score, delta });
+    const catDelta = catsBefore - cats.length;
+    score += catDelta;
+    if (catDelta > 0) produced.push({ type: 'score_change', frame, score, delta: catDelta });
+
+    // Dogs fled
+    const dogsBefore = dogs.length;
+    dogs = dogs.filter(d => {
+      if (d.isGone()) {
+        produced.push({ type: 'dog_fled', frame,
+          cx: Math.round(d.x), cy: Math.round(d.y) });
+        return false;
+      }
+      return true;
+    });
+    const dogDelta = dogsBefore - dogs.length;
+    score += dogDelta * DOG_POINTS;
+    if (dogDelta > 0) produced.push({ type: 'score_change', frame, score, delta: dogDelta * DOG_POINTS });
 
     if (lives <= 0) {
       produced.push({ type: 'game_over', frame, score });
