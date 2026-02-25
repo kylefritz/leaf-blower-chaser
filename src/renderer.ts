@@ -132,7 +132,7 @@ export function drawHUD(score: number, catCount: number, dogCount: number, frame
     ctx.fillStyle   = '#fff';
     ctx.font        = '16px Arial';
     ctx.textAlign   = 'center';
-    ctx.fillText('Aim the leaf blower to scare cats & dogs off screen to score!', W / 2, H - 48);
+    ctx.fillText('Aim the leaf blower (mouse or touch) to scare cats & dogs off screen!', W / 2, H - 48);
     ctx.font        = '13px Arial';
     ctx.fillStyle   = '#bbb';
     ctx.fillText('Dogs are tougher but worth more. Don\u2019t let them reach you!', W / 2, H - 28);

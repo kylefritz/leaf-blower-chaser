@@ -180,12 +180,26 @@ function loop(): void {
 }
 
 // ─── Input ───────────────────────────────────────────────────────────────────
-canvas.addEventListener('mousemove', (e: MouseEvent) => {
+function updateMouseFromClient(clientX: number, clientY: number): void {
   const r  = canvas.getBoundingClientRect();
   const sx = canvas.width  / r.width;
   const sy = canvas.height / r.height;
-  mouse.x  = (e.clientX - r.left) * sx;
-  mouse.y  = (e.clientY - r.top)  * sy;
+  mouse.x  = (clientX - r.left) * sx;
+  mouse.y  = (clientY - r.top)  * sy;
+}
+
+canvas.addEventListener('mousemove', (e: MouseEvent) => {
+  updateMouseFromClient(e.clientX, e.clientY);
+});
+
+canvas.addEventListener('touchstart', (e: TouchEvent) => {
+  e.preventDefault();
+  updateMouseFromClient(e.touches[0].clientX, e.touches[0].clientY);
+});
+
+canvas.addEventListener('touchmove', (e: TouchEvent) => {
+  e.preventDefault();
+  updateMouseFromClient(e.touches[0].clientX, e.touches[0].clientY);
 });
 
 // ─── Go ──────────────────────────────────────────────────────────────────────
