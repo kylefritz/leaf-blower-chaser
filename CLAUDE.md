@@ -1,6 +1,6 @@
-# Leaf Blower Cat Chaser
+comm# Leaf Blower Chaser
 
-2D top-down browser game. Human scares cats with a leaf blower. Mouse-only controls.
+2D top-down browser game. Human scares cats and dogs with a leaf blower. Mouse-only controls.
 Built with TypeScript, bundled with Bun, rendered on HTML5 Canvas.
 
 ## Build & run
@@ -18,10 +18,13 @@ in production they go to Neon Postgres.
 ## Deployment
 
 Hosted on [Fly.io](https://fly.io) at **https://leaf-blower-cat-chaser.fly.dev/**.
+GitHub repo: `kylefritz/leaf-blower-chaser`.
 
-```bash
-flyctl deploy   # build Docker image and deploy to Fly.io
-```
+Pushing to `main` triggers CI (`.github/workflows/fly-deploy.yml`):
+1. **Test** — installs Bun, runs `bun test`
+2. **Deploy** — builds Docker image and deploys to Fly.io (only if tests pass)
+
+To deploy manually: `flyctl deploy`
 
 The `Dockerfile` builds with `bun run build`, then runs `server.ts` with `NODE_ENV=production`
 (skips the file watcher). Config is in `fly.toml`.
@@ -35,9 +38,15 @@ Production event logging uses [Neon](https://neon.tech) serverless Postgres
 fly secrets set DATABASE_URL="postgresql://..." --app leaf-blower-cat-chaser
 ```
 
+Neon project ID: `royal-dream-25156244` (named `leaf-blower-cat-chaser`).
+
 The `game_events` table stores events with typed columns (`session`, `type`, `t`, `frame`)
 and a `data` JSONB column for event-specific fields. Indexes on `session`, `type`,
 and `(session, frame)`.
+
+**Important:** Use `sql.query(queryString, paramsArray)` — not tagged template literals —
+when calling the Neon serverless driver. The tagged template form `sql\`...\`` silently
+fails when called as a regular function.
 
 To test Neon locally, use direnv (`.envrc` is gitignored):
 
@@ -53,14 +62,16 @@ Then `direnv allow && bun run server.ts`.
 
 | File | Responsibility |
 |------|---------------|
-| `src/constants.ts` | Canvas size, player position, wind range, cat cap |
+| `src/constants.ts` | Canvas size, player position, wind range, cat/dog caps, dog points |
 | `src/canvas.ts` | Canvas/ctx setup, viewport scaling on resize |
 | `src/grass.ts` | Pre-rendered offscreen grass background |
 | `src/particle.ts` | Wind particle emitted from the nozzle each frame |
-| `src/popup.ts` | Floating "+1 😸" text when a cat is scared off-screen |
-| `src/cat.ts` | Cat entity — wandering AI, wind response, drawing |
+| `src/popup.ts` | Floating score text when an animal is scared off-screen |
+| `src/blowable.ts` | Shared interface for Cat and Dog entities |
+| `src/cat.ts` | Cat entity — wandering AI, wind response, drawing (1 point) |
+| `src/dog.ts` | Dog entity — tougher, faster, harder to blow away (2 points) |
 | `src/renderer.ts` | Stateless draw functions: player, wind cone, HUD, cursor |
-| `src/main.ts` | Game loop, state arrays, input, wind→cat collision, player death |
+| `src/main.ts` | Game loop, state arrays, input, wind collision, player death, cat & dog scoring |
 | `src/rng.ts` | Seeded PRNG (mulberry32) — `rand()` replaces `Math.random()` in game logic |
 | `src/logger.ts` | Browser-side event queue; batches to `POST /log` every 2 s, flushes on unload |
 | `src/replay.ts` | Pure replay function — seeds RNG, feeds mouse angles, simulates loop, returns events |
@@ -69,7 +80,9 @@ Then `direnv allow && bun run server.ts`.
 ## Tooling
 
 - **Bun only** — no Node.js, no npm, no `node` commands. Use `bun`, `bun run`, `bun test`, `bun build`.
+- **direnv** for local env vars (`.envrc` is gitignored). `direnv allow` after editing.
 - Use `jq` for log inspection and fixture extraction (see Tests section below).
+- **act** for testing GH Actions locally: `act -j test --container-architecture linux/amd64` (requires Docker).
 
 ## Code conventions
 
@@ -81,6 +94,9 @@ Then `direnv allow && bun run server.ts`.
 - `server.ts` is Bun-only (never bundled). `src/logger.ts` is browser-only (no Node/Bun imports).
 - **Game logic uses `rand()` from `rng.ts`, never `Math.random()` directly.** Particles and grass keep `Math.random()` — they're visual and must not pollute the game-logic RNG stream.
 - `src/replay.ts` mirrors the game loop from `main.ts`. If you change game logic in `main.ts`, apply the same change to `replay.ts`.
+- New entity types should implement the `Blowable` interface from `blowable.ts` so they work with `applyWindToCats()` in `wind.ts`.
+- **RNG stream ordering matters for replay**: entity spawns must happen in a fixed order in the frame loop (cats first, then dogs) to keep the PRNG stream consistent.
+- When passing `drawHUD` arguments, ensure the parameter order matches: `(score, catCount, dogCount, frame, lives)`.
 
 ## Tests
 
@@ -106,12 +122,12 @@ in process, so they do need the canvas mock (via setup.ts preload).
 
 ### Deterministic replay
 
-Every session logs a `seed` in `session_start` and a `cat_spawn` event for each cat.
+Every session logs a `seed` in `session_start` and a `cat_spawn`/`dog_spawn` event for each entity.
 `src/replay.ts` can reconstruct a session deterministically:
 
-1. Seed the PRNG with the logged seed — cat spawns and wander match the original.
+1. Seed the PRNG with the logged seed — cat and dog spawns and wander match the original.
 2. Feed `mouse_move` angles back as `playerAngle` each frame.
-3. Run the game-logic loop — `cat_scared`, `cat_fled`, `score_change`, `player_hit` events are produced.
+3. Run the game-logic loop — `cat_scared`, `dog_scared`, `cat_fled`, `dog_fled`, `score_change`, `player_hit` events are produced.
 4. Diff the produced events against the log to verify the simulation is correct.
 
 To write a fixture-based replay test for a real session:
@@ -124,6 +140,7 @@ Then load the fixture in a test and assert `replay(events)` matches the logged e
 Use `jq` to inspect and extract log data, e.g.:
 ```bash
 jq -c 'select(.type == "cat_scared")' game-log.jsonl          # filter by type
+jq -c 'select(.type == "dog_fled")' game-log.jsonl            # dog events
 jq -r '[.frame,.cx,.cy] | @tsv' ...                            # tabular output
 jq -c 'select(.session == "uuid" and .frame >= 100)' ...       # filter by session + frame
 ```
@@ -131,11 +148,15 @@ jq -c 'select(.session == "uuid" and .frame >= 100)' ...       # filter by sessi
 ## Agent teams
 
 Use a team when changes span multiple independent modules at once — e.g. adding a
-new entity type (needs `cat.ts` style changes + `renderer.ts` additions + `main.ts`
+new entity type (needs `dog.ts` + `renderer.ts` additions + `main.ts` + `replay.ts`
 wiring). Suggested split:
 
-- **mechanic** — game logic: `cat.ts`, `main.ts`, `constants.ts`
-- **renderer** — visuals: `renderer.ts`, `particle.ts`, `popup.ts`, `grass.ts`
+- **mechanic** — game logic: `cat.ts`, `dog.ts`, `main.ts`, `replay.ts`, `constants.ts`, `wind.ts`, `blowable.ts`
+- **renderer** — visuals: `renderer.ts`, `particle.ts`, `popup.ts`, `grass.ts`, entity `draw()` methods
 - **builder** — validate: runs `bun run build` and reports errors
 
 For single-module edits, work directly without a team.
+
+When using teams for a new entity type, the mechanic creates the entity class with a
+placeholder `draw()`, and the renderer replaces it with proper visuals. Both run in parallel.
+Run builder after both complete to verify integration.
