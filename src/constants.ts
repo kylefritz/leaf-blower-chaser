@@ -7,4 +7,6 @@ export const WIND_HALF_ANGLE = 0.30;   // ~17° each side
 export const MAX_CATS        = 10;
 export const MAX_DOGS        = 5;
 export const DOG_POINTS      = 2;
+export const YINZI_POINTS    = 3;
+export const YINZI_SCORE_REQ = 7;   // Yinzis appear after score > 7
 export const PLAYER_RADIUS   = 28;

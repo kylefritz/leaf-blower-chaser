@@ -1,9 +1,10 @@
 import { canvas }                                           from './canvas';
-import { W, H, PX, PY, MAX_CATS, MAX_DOGS, DOG_POINTS, PLAYER_RADIUS } from './constants';
+import { W, H, PX, PY, MAX_CATS, MAX_DOGS, DOG_POINTS, PLAYER_RADIUS, YINZI_POINTS, YINZI_SCORE_REQ } from './constants';
 import { Particle }                                          from './particle';
 import { Popup }                                             from './popup';
 import { Cat }                                               from './cat';
 import { Dog }                                               from './dog';
+import { Yinzi }                                             from './yinzi';
 import { Mouse, drawBackground, drawWindCone, drawPlayer, drawHUD, drawGameOver, drawCursor } from './renderer';
 import { applyWindToCats }                                   from './wind';
 import { logEvent }                                          from './logger';
@@ -15,6 +16,7 @@ let playerAngle    = 0;
 let particles: Particle[] = [];
 let cats: Cat[]            = [];
 let dogs: Dog[]            = [];
+let yinzis: Yinzi[]        = [];
 let popups: Popup[]        = [];
 let score        = 0;
 let lives        = 3;
@@ -22,6 +24,8 @@ let invincible   = 0;
 let gameOver     = false;
 let spawnTimer   = 0;
 let dogSpawnTimer = 0;
+let yinziSpawnTimer = 0;
+let yinziMaxCount   = 1;     // doubles each wave
 let frame        = 0;
 
 // ─── Game loop ───────────────────────────────────────────────────────────────
@@ -69,12 +73,33 @@ function loop(): void {
     dogSpawnTimer = 0;
   }
 
+  // Spawn yinzis — after score > YINZI_SCORE_REQ, count doubles each wave
+  if (score > YINZI_SCORE_REQ) {
+    yinziSpawnTimer++;
+    const yinziInterval = Math.max(120, 250 - score * 2);
+    if (yinziSpawnTimer >= yinziInterval && yinzis.length === 0) {
+      for (let i = 0; i < yinziMaxCount; i++) {
+        const y = new Yinzi();
+        logEvent('yinzi_spawn', frame, {
+          x: Math.round(y.x), y: Math.round(y.y),
+          sz: +y.sz.toFixed(2),
+          vx: +y.vx.toFixed(3), vy: +y.vy.toFixed(3),
+          wanderAngle: +y.wanderAngle.toFixed(3),
+        });
+        yinzis.push(y);
+      }
+      yinziMaxCount *= 2;
+      yinziSpawnTimer = 0;
+    }
+  }
+
   // Update
   for (const p of particles) p.update();
   particles = particles.filter(p => !p.dead);
 
   for (const c of cats) c.update();
   for (const d of dogs) d.update();
+  for (const z of yinzis) z.update();
 
   applyWindToCats(cats, playerAngle, PX, PY, (force, cx, cy) => {
     logEvent('cat_scared', frame, {
@@ -85,6 +110,13 @@ function loop(): void {
 
   applyWindToCats(dogs, playerAngle, PX, PY, (force, cx, cy) => {
     logEvent('dog_scared', frame, {
+      force: Math.round(force * 1000) / 1000,
+      cx: Math.round(cx), cy: Math.round(cy),
+    });
+  });
+
+  applyWindToCats(yinzis, playerAngle, PX, PY, (force, cx, cy) => {
+    logEvent('yinzi_scared', frame, {
       force: Math.round(force * 1000) / 1000,
       cx: Math.round(cx), cy: Math.round(cy),
     });
@@ -108,6 +140,18 @@ function loop(): void {
           lives--;
           invincible = 120;
           logEvent('player_hit', frame, { entity: 'dog', lives, cx: Math.round(d.x), cy: Math.round(d.y) });
+          return false;
+        }
+        return true;
+      });
+    }
+
+    if (invincible === 0) {
+      yinzis = yinzis.filter(z => {
+        if (Math.hypot(z.x - PX, z.y - PY) < PLAYER_RADIUS + z.sz) {
+          lives--;
+          invincible = 120;
+          logEvent('player_hit', frame, { entity: 'yinzi', lives, cx: Math.round(z.x), cy: Math.round(z.y) });
           return false;
         }
         return true;
@@ -165,15 +209,34 @@ function loop(): void {
   score += dogDelta * DOG_POINTS;
   if (dogDelta > 0) logEvent('score_change', frame, { score, delta: dogDelta * DOG_POINTS });
 
+  // Remove yinzis that fled off-screen
+  const yinzisBefore = yinzis.length;
+  yinzis = yinzis.filter(z => {
+    if (z.isGone()) {
+      logEvent('yinzi_fled', frame, { cx: Math.round(z.x), cy: Math.round(z.y) });
+      popups.push(new Popup(
+        Math.max(30, Math.min(W - 30, z.x)),
+        Math.max(30, Math.min(H - 30, z.y)),
+        `+${YINZI_POINTS} \uD83D\uDC69`,
+      ));
+      return false;
+    }
+    return true;
+  });
+  const yinziDelta = yinzisBefore - yinzis.length;
+  score += yinziDelta * YINZI_POINTS;
+  if (yinziDelta > 0) logEvent('score_change', frame, { score, delta: yinziDelta * YINZI_POINTS });
+
   // Draw
   drawBackground();
   drawWindCone(playerAngle);
   for (const p of particles) p.draw();
   for (const c of cats)      c.draw();
   for (const d of dogs)      d.draw();
+  for (const z of yinzis)    z.draw();
   drawPlayer(playerAngle, invincible);
   for (const p of popups)    p.draw();
-  drawHUD(score, cats.length, dogs.length, frame, lives);
+  drawHUD(score, cats.length, dogs.length, yinzis.length, frame, lives);
   drawCursor(mouse);
 
   requestAnimationFrame(loop);

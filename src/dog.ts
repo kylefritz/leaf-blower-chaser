@@ -74,6 +74,12 @@ export class Dog implements Blowable {
       this.vy += Math.sin(this.wanderAngle) * 0.06;
       const sp = Math.hypot(this.vx, this.vy);
       if (sp > 2.0) { this.vx = (this.vx / sp) * 2.0; this.vy = (this.vy / sp) * 2.0; }
+      // Small attraction toward player — prevents edge sticking
+      const tpx = PX - this.x;
+      const tpy = PY - this.y;
+      const td  = Math.hypot(tpx, tpy);
+      if (td > 1) { this.vx += (tpx / td) * 0.02; this.vy += (tpy / td) * 0.02; }
+
       if (this.x < 40)     this.vx += 0.12;
       if (this.x > W - 40) this.vx -= 0.12;
       if (this.y < 40)     this.vy += 0.12;

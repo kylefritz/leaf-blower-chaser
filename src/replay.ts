@@ -10,9 +10,10 @@
  */
 import { Cat }             from './cat';
 import { Dog }             from './dog';
+import { Yinzi }           from './yinzi';
 import { applyWindToCats } from './wind';
 import { seedRandom }      from './rng';
-import { PX, PY, MAX_CATS, MAX_DOGS, DOG_POINTS, PLAYER_RADIUS } from './constants';
+import { PX, PY, MAX_CATS, MAX_DOGS, DOG_POINTS, YINZI_POINTS, YINZI_SCORE_REQ, PLAYER_RADIUS } from './constants';
 import type { GameEvent }  from './logger';
 
 export interface ReplayEvent {
@@ -37,13 +38,16 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
 
   const maxFrame = Math.max(...sessionEvents.map(e => e.frame));
 
-  let cats:         Cat[]  = [];
-  let dogs:         Dog[]  = [];
+  let cats:         Cat[]   = [];
+  let dogs:         Dog[]   = [];
+  let yinzis:       Yinzi[] = [];
   let score         = 0;
   let lives         = typeof start.lives === 'number' ? (start.lives as number) : 3;
   let invincible    = 0;
   let spawnTimer    = 0;
   let dogSpawnTimer = 0;
+  let yinziSpawnTimer = 0;
+  let yinziMaxCount   = 1;
   let playerAngle   = 0;
 
   const produced: ReplayEvent[] = [];
@@ -67,9 +71,23 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
       dogSpawnTimer = 0;
     }
 
+    // Spawn yinzis — after dogs to keep RNG stream consistent
+    if (score > YINZI_SCORE_REQ) {
+      yinziSpawnTimer++;
+      const yinziInterval = Math.max(120, 250 - score * 2);
+      if (yinziSpawnTimer >= yinziInterval && yinzis.length === 0) {
+        for (let i = 0; i < yinziMaxCount; i++) {
+          yinzis.push(new Yinzi());
+        }
+        yinziMaxCount *= 2;
+        yinziSpawnTimer = 0;
+      }
+    }
+
     // Update
     for (const c of cats) c.update();
     for (const d of dogs) d.update();
+    for (const z of yinzis) z.update();
 
     // Wind — cats
     applyWindToCats(cats, playerAngle, PX, PY, (force, cx, cy) => {
@@ -81,6 +99,13 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
     // Wind — dogs
     applyWindToCats(dogs, playerAngle, PX, PY, (force, cx, cy) => {
       produced.push({ type: 'dog_scared', frame,
+        force: Math.round(force * 1000) / 1000,
+        cx: Math.round(cx), cy: Math.round(cy) });
+    });
+
+    // Wind — yinzis
+    applyWindToCats(yinzis, playerAngle, PX, PY, (force, cx, cy) => {
+      produced.push({ type: 'yinzi_scared', frame,
         force: Math.round(force * 1000) / 1000,
         cx: Math.round(cx), cy: Math.round(cy) });
     });
@@ -106,6 +131,20 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
             invincible = 120;
             produced.push({ type: 'player_hit', frame, entity: 'dog', lives,
               cx: Math.round(d.x), cy: Math.round(d.y) });
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Player collision — yinzis
+      if (invincible === 0) {
+        yinzis = yinzis.filter(z => {
+          if (Math.hypot(z.x - PX, z.y - PY) < PLAYER_RADIUS + z.sz) {
+            lives--;
+            invincible = 120;
+            produced.push({ type: 'player_hit', frame, entity: 'yinzi', lives,
+              cx: Math.round(z.x), cy: Math.round(z.y) });
             return false;
           }
           return true;
@@ -141,6 +180,20 @@ export function replay(sessionEvents: GameEvent[]): ReplayEvent[] {
     const dogDelta = dogsBefore - dogs.length;
     score += dogDelta * DOG_POINTS;
     if (dogDelta > 0) produced.push({ type: 'score_change', frame, score, delta: dogDelta * DOG_POINTS });
+
+    // Yinzis fled
+    const yinzisBefore = yinzis.length;
+    yinzis = yinzis.filter(z => {
+      if (z.isGone()) {
+        produced.push({ type: 'yinzi_fled', frame,
+          cx: Math.round(z.x), cy: Math.round(z.y) });
+        return false;
+      }
+      return true;
+    });
+    const yinziDelta = yinzisBefore - yinzis.length;
+    score += yinziDelta * YINZI_POINTS;
+    if (yinziDelta > 0) produced.push({ type: 'score_change', frame, score, delta: yinziDelta * YINZI_POINTS });
 
     if (lives <= 0) {
       produced.push({ type: 'game_over', frame, score });

@@ -108,7 +108,7 @@ export function drawPlayer(angle: number, invincible = 0): void {
   ctx.restore();
 }
 
-export function drawHUD(score: number, catCount: number, dogCount: number, frame: number, lives = 3): void {
+export function drawHUD(score: number, catCount: number, dogCount: number, yinziCount: number, frame: number, lives = 3): void {
   // score panel
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.beginPath(); ctx.roundRect(12, 12, 215, 50, 8); ctx.fill();
@@ -118,10 +118,11 @@ export function drawHUD(score: number, catCount: number, dogCount: number, frame
 
   // on-screen count
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.roundRect(12, 68, 230, 30, 6); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(12, 68, 310, 30, 6); ctx.fill();
   ctx.fillStyle = '#ccc';
   ctx.font      = '14px Arial';
-  ctx.fillText(`On screen: \u{1F638} ${catCount}/${MAX_CATS}  \u{1F436} ${dogCount}/${MAX_DOGS}`, 22, 88);
+  const yinziStr = yinziCount > 0 ? `  \u{1F469} ${yinziCount}` : '';
+  ctx.fillText(`On screen: \u{1F638} ${catCount}/${MAX_CATS}  \u{1F436} ${dogCount}/${MAX_DOGS}${yinziStr}`, 22, 88);
 
   // instructions — fade out after ~5 s
   if (frame < 320) {
